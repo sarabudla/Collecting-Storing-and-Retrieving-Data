@@ -1,0 +1,186 @@
+---
+title: "DA5020.A7.Nithya.Sarabudla"
+author: "nithyasarabudla"
+date: "2023-10-25"
+output:
+  pdf_document: default
+  html_document: default
+  
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## loading the packages 
+```{r}
+library(rvest)
+library(dplyr)
+library(ggplot2)
+library (tidyverse)
+```
+
+## extract the tabular data on the “Percent of 
+## population living on less than $1.15, $2.60 and $3.85 a day” from the Wikipedia page.
+# Question 1 
+# PART 1
+##  Scrape the data from the webpage and extract the following fields: Country, < $1.15, <
+## $2.60, < $3.85, Year and Continent. Prepare the data for analysis and ensure that the columns have
+## meaningful names.
+
+```{r}
+# Read the HTML page from the given URL
+page = read_html("https://en.wikipedia.org/w/index.php?title=List_of_sovereign_states_by_percentage_of_population_living_in_poverty&diff=prev&oldid=1177591928")
+
+# Extract the third table from the HTML page
+table <- html_table(page)[3]
+table
+# Convert the table to a data frame
+df <- data.frame(table)
+
+# Rename the columns
+colnames(df) <- c("Country", "less_than_1.15", "less_than_2.60", "less_than_3.85", "Year", "Continent")
+
+# Clean and convert the "less_than_1.15" column by removing any trailing characters and converting to numeric
+df$less_than_1.15 <- as.array(df$less_than_1.15)
+df$less_than_1.15 <- substring(df$less_than_1.15,1,nchar(df$less_than_1.15)-1)
+df$less_than_1.15 <- as.numeric(df$less_than_1.15)
+
+# Clean and convert the "less_than_2.60" column by removing any trailing characters and converting to numeric
+df$less_than_2.60<- as.array(df$less_than_2.60) 
+df$less_than_2.60 <- substring(df$less_than_2.60,1,nchar(df$less_than_2.60)-1) 
+df$less_than_2.60 <- as.numeric(df$less_than_2.60)
+
+# Clean and convert the "less_than_3.85" column by removing any trailing characters and converting to numeric
+df$less_than_3.85 <- as.array(df$less_than_3.85) 
+df$less_than_3.85 <- substring(df$less_than_3.85,1,nchar(df$less_than_3.85)-1) 
+df$less_than_3.85<- as.numeric(df$less_than_3.85)
+
+# Display the first few rows of the data frame
+head(df)
+```
+
+# PART 2
+##  Calculate the mean and the standard deviation of the percent of the population living under
+## $3.85 per day for each continent. Perform a comparative analysis (i.e. explanation) of the data from
+## each continent
+
+```{r}
+# Calculate the mean and standard deviation of "less_than_3.85" percentages for each continent
+less_than_3.85_df <- df %>% 
+  select(Continent, less_than_3.85) %>% 
+  group_by(Continent) %>% 
+  summarise(Mean = mean(less_than_3.85, na.rm = TRUE), std_dev = sd(less_than_3.85, na.rm = TRUE))
+
+less_than_3.85_df
+
+# Find and display the continent with the lowest mean poverty level
+min_mean_continent <- less_than_3.85_df %>%
+  filter(Mean == min(Mean)) %>%
+  select(Continent) %>%
+  pull()
+cat("Continent with the lowest mean poverty level:", min_mean_continent, "\n")
+
+# Find and display the continent with the lowest standard deviation
+min_std_dev_continent <- less_than_3.85_df %>%
+  filter(std_dev == min(std_dev)) %>%
+  select(Continent) %>%
+  pull()
+cat("Continent with the lowest standard deviation:", min_std_dev_continent, "\n")
+
+# Find and display the continent with the highest mean poverty level
+max_mean_continent <- less_than_3.85_df %>%
+  filter(Mean == max(Mean)) %>%
+  select(Continent) %>%
+  pull()
+cat("Continent with the highest mean poverty level:", max_mean_continent, "\n")
+
+# Find and display the continent with the highest standard deviation
+max_std_dev_continent <- less_than_3.85_df %>%
+  filter(std_dev == max(std_dev)) %>%
+  select(Continent) %>%
+  pull()
+cat("Continent with the highest standard deviation:", max_std_dev_continent, "\n")
+
+```
+
+# PART 3 
+##  What are the 10 countries with the highest percentage of the population having an income
+## of less than $3.85 per day? Using a suitable chart, display the country name, the percentage and
+## color- code by the Continent. Summarize your findings
+```{r}
+# Extract the top 10 countries with the highest percentage of income less than $3.85
+top_10_countries <- df %>%
+  arrange(desc(less_than_3.85)) %>%
+  head(10)
+
+# Create a bar plot to visualize the top 10 countries' income percentages
+df %>%
+  arrange(desc(less_than_3.85)) %>%
+  select(Country, less_than_3.85, Continent) %>%
+  head(10) %>%
+  ggplot(aes(x = reorder(Country, desc(less_than_3.85)), y = less_than_3.85, fill = Continent)) +
+  geom_bar(stat = 'identity') +
+  theme(axis.text.x = element_text(angle = 90))
+
+# Summarize your findings
+summary(top_10_countries)
+
+```
+
+From the above plot, it's evident that the majority of the countries with the highest percentage of the population living 
+on less than $3.85 per day are from Africa. Specifically, out of the top 10 countries in this category, 9 are from Africa,  while only 1 country is from Asia. South Sudan ranks as the top country with the highest percentage of its population
+earning less than $3.85 per day. The 10th country on the list with the highest population living on less than $3.85 per day is Mali, also from Africa.
+
+# PART 4 
+## Explore the countries with the lowest percentage of the population having an income of
+## less than $3.85 per day. What are the 5 countries with the lowest percentage, and how does the
+## results compare to the other income groups (i.e. $1.15 and $2.60)?
+```{r}
+# Arrange the data frame in ascending order of the "less_than_3.85" column
+# and select the top 5 rows with the lowest income percentages
+df %>% arrange(less_than_3.85) %>% head(5)
+
+```
+Among the 5 countries with the lowest population percentage living on less than $3.85 per day, 2 are in Asia (Azerbaijan
+the United Arab Emirates) with a 0% population in this category, while the remaining 3 are from Europe (Iceland, Belarus, 
+and Finland) with percentages ranging from 0.04% to 0.1%. For the less than $2.60 per day threshold, only Finland has 0.1%,  with the rest at 0%. In all these countries, when considering less than $1.15 per day, the population percentage is 0%.
+
+# PART 5 
+## Extract the data for any two continents of your choice. For each continent, visualize the
+## percent of the population living on less than $1.90, $3.20 and $5.50 using box plots. Compare and
+## contrast the results, while ensuring that you discuss the distribution, skew and any outliers that are
+## evident.
+```{r}
+# Create a box plot to visualize the income distribution in Africa
+df %>%
+  filter(Continent == "Africa") %>%
+  pivot_longer(cols = starts_with("less"), names_to = "Income Level", values_to = "Percentage") %>%
+  ggplot(aes(x = `Income Level`, y = Percentage)) +
+  geom_boxplot() +
+  ggtitle("Box plot of population in Africa") +
+  xlab("Income Level") + 
+  ylab("% of Population")
+
+# Create a box plot to visualize the income distribution in Europe
+df %>%
+  filter(Continent == "Europe") %>%
+  pivot_longer(cols = starts_with("less"), names_to = "Income Level", values_to = "Percentage") %>%
+  ggplot(aes(x = `Income Level`, y = Percentage)) +
+  geom_boxplot() +
+  ggtitle("Box plot of population in Europe") +
+  xlab("Income Level") + 
+  ylab("% of Population")
+```
+
+## Box Plot for Asia:
+Distribution: The box plot for "Asia" shows that the distribution of the population living on less than $1.15 is right skewed, while the distribution for less than $2.60 is slightly left-skewed, and the distribution for less than $3.85 is  strongly left-skewed.
+
+Skew: Right-skewed for less than $1.15, with most people having lower income.
+Slightly left-skewed for less than $2.60, where the majority have higher income.
+Strongly left-skewed for less than $3.85, indicating that the majority have even higher income levels.
+
+Outliers: There are 4 outliers in less_than_3.85 means there are a few places or individuals in Asia with much lower income compared to most people. 
+
+## Box Plot for Europe :
+In Europe, the income distribution for less than $1.15, less than $2.60, and less than $3.85 is strongly right-skewed.
+This indicates that the majority of the population in Europe has higher income levels, with a long tail of individuals who have lower income. There are a few outliers in the three income levels, which represent exceptional cases of individuals or regions with significantly lower income than the majority of the population. 

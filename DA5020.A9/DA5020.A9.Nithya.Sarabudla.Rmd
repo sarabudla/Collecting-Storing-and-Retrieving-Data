@@ -1,0 +1,270 @@
+---
+title: "DA5020.A9.Nithya.Sarabudla"
+author: "nithyasarabudla"
+date: "2023-11-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(rvest)
+library(RSocrata)
+
+```
+
+# Question 1 
+```{r}
+# loading the data
+air_traffic_passenger_stats <- read.socrata("https://data.sfgov.org/Transportation/Air-Traffic-Passenger-Statistics/rkru-6vcg")
+
+str(air_traffic_passenger_stats)
+
+
+```
+
+# Question 2 
+
+```{r}
+
+# Convert relevant columns to numeric data types for analysis
+air_traffic_passenger_stats$activity_period <- as.numeric(air_traffic_passenger_stats$activity_period)
+air_traffic_passenger_stats$passenger_count <- as.numeric(air_traffic_passenger_stats$passenger_count)
+
+# Filter the dataset to include only domestic passenger activity in March
+domestic_march_data <- air_traffic_passenger_stats %>%
+  filter(geo_summary == "Domestic" & format(activity_period_start_date, "%m") == "03")
+
+# Create the 'year' column from 'activity_period'
+domestic_march_data <- domestic_march_data %>%
+  mutate(year = floor(activity_period / 100))  # Assuming 'activity_period' is in YYYYMM format
+
+# Aggregate the data to calculate the total passengers for each year
+total_domestic_passengers <- domestic_march_data %>%
+  group_by(activity_period, year) %>%
+ summarise(total_passengers = sum(passenger_count, na.rm = TRUE))
+
+# Create the plot
+ggplot(total_domestic_passengers, aes(x = year, y = total_passengers)) +
+  geom_line(color = "green") +
+  geom_point(color = "blue") +
+  geom_text(aes(label = year), position = position_dodge(width = 0.7),
+           vjust = -0.3) +
+  labs(title = "Total Number of Domestic Passengers in March from 2000 to 2023",
+       subtitle = "Highest Number of Passengers were recorded in March 2018",
+       x = "Year", y = "Total Passengers",
+       caption = "According to the Data from sfgov.org")
+
+
+```
+
+In the graph Total Number of Domestic passengers in march from 2000 to 2023, Highest number of passengers were recorded in march 2018 and least number of passengers are recorded in 2021, there is increase in passengers from 2003 to 2018 and got major decline in 2020 and 2021.
+
+
+# Question 3 
+```{r}
+# Select data for specific time periods (201603, 201703, 201803) for simple moving average
+simple_moving_average_data <- total_domestic_passengers %>%
+  filter(activity_period %in% c(201603, 201703, 201803)) %>%
+  select(activity_period, total_passengers)
+
+# Compute the mean of the total passengers from selected time periods for simple moving average
+simple_moving_average <- mean(simple_moving_average_data$total_passengers)
+
+# Forecast the total passenger count for March 2019 for simple moving average
+forecasted_value_sma <- simple_moving_average
+
+# Extract the actual total passengers for March 2019 for simple moving average
+actual_value_sma <- total_domestic_passengers %>%
+  filter(activity_period == 201903) %>%
+  pull(total_passengers)
+
+# Calculate the error for simple moving average
+error_sma <- actual_value_sma - forecasted_value_sma
+
+# Print the results for simple moving average
+cat("Forecasted Value for March 2019 (SMA):", forecasted_value_sma, "\n")
+cat("Actual Value for March 2019 (SMA):", actual_value_sma, "\n")
+cat("Error (SMA):", error_sma, "\n")
+
+```
+This positive error indicates that the SMA underestimated the total passenger count for March 2019. The actual value is higher than the forecasted value by approximately 64,059.67.
+
+# Question 4 
+```{r}
+# Define weights for the three-year weighted moving average
+weights <- c(3, 5, 7)
+
+# Select data for specific time periods (201603, 201703, 201803) for weighted moving average
+weighted_moving_average_data <- total_domestic_passengers %>%
+  filter(activity_period %in% c(201603, 201703, 201803)) %>%
+  select(activity_period, total_passengers)
+
+# Compute the weighted moving average for total passenger count
+weighted_moving_average <- sum(weighted_moving_average_data$total_passengers * weights) / sum(weights)
+
+# Forecast the total passenger count for March 2019 for weighted moving average
+forecasted_value_wma <- weighted_moving_average
+
+# Calculate the error for weighted moving average
+error_wma <- actual_value_sma - forecasted_value_wma
+
+# Print the results for the weighted moving average
+cat("Weighted Moving Average Forecast for March 2019 (WMA):", forecasted_value_wma, "\n")
+cat("Actual Value for March 2019 (WMA):", actual_value_sma, "\n")
+cat("Error (WMA):", error_wma, "\n")
+
+```
+
+This positive error indicates that the WMA slightly underestimated the total passenger count for March 2019. The actual value is higher than the forecasted value by approximately 17,188.73.
+
+# Question 5
+```{r}
+# Filter data for training the exponential smoothing model
+training_data_es <- total_domestic_passengers %>%
+  filter(activity_period >= 200803 & activity_period <= 201803) %>%
+  select(activity_period, total_passengers)
+
+# Initialize forecast and smoothing parameter
+forecast <- training_data_es$total_passengers[1]
+alpha <- 0.7
+
+# Update forecast and smoothing parameter for each observation
+for (i in 2:length(training_data_es$total_passengers)) {
+  actual <- training_data_es$total_passengers[i]
+  forecast <- alpha * actual + (1 - alpha) * forecast
+}
+
+# Forecast the total passenger count for March 2019
+forecasted_value_es <- forecast
+
+# Extract the actual total passengers for March 2019
+actual_value_es <- total_domestic_passengers %>%
+  filter(activity_period == 201903) %>%
+  pull(total_passengers)
+
+# Calculate the error for exponential smoothing
+error_es <- actual_value_es - forecasted_value_es
+
+# Print the results for exponential smoothing
+cat("Forecasted Value for March 2019 (Exponential Smoothing):", forecasted_value_es, "\n")
+cat("Actual Value for March 2019:", actual_value_es, "\n")
+cat("Error (Exponential Smoothing):", error_es, "\n")
+
+```
+
+The Exponential Smoothing model with alpha set to 0.7 forecasted a total passenger count of 3,495,868 for March 2019, exceeding the actual value of 3,449,863 by 46,005.37. The negative error indicates an overestimation by the model, suggesting a potential sensitivity to recent observations and a need for further tuning.
+
+# Question 6 
+```{r}
+# Filter the dataset for the time period from 2008 to 2018
+data <- total_domestic_passengers %>%
+  filter(activity_period >= 200803 & activity_period <= 201803) %>%
+  select(activity_period, total_passengers)
+
+# Fit a simple linear regression model
+linear_regression_model <- lm(total_passengers ~ activity_period, data = data)
+
+# Extract the coefficients
+intercept <- coef(linear_regression_model)[1]
+slope <- coef(linear_regression_model)[2]
+
+# Function to make predictions using the coefficients
+predict_passengers <- function(year) {
+  return(intercept + slope * year)
+}
+
+# Make predictions for 2019 and 2020
+prediction_2019 <- predict_passengers(201903)
+prediction_2020 <- predict_passengers(202003)
+
+# Print the results
+cat("Forecasted Value for 2019 (Linear Regression):", prediction_2019, "\n")
+cat("Forecasted Value for 2020 (Linear Regression):", prediction_2020, "\n")
+
+```
+
+
+The linear regression model predicts an increasing trend in total passenger activity based on historical data from 2008 to 2018. The forecasted values for 2019 and 2020 are 3,646,905 and 3,778,674, respectively.
+
+# Question 7
+
+```{r}
+# Question 5 - Exponential Smoothing Model
+# Filter data for training the exponential smoothing model
+training_data_es <- total_domestic_passengers %>%
+  filter(activity_period >= 200803 & activity_period <= 201803) %>%
+  select(activity_period, total_passengers)
+
+# Initialize forecast and smoothing parameter
+forecast <- training_data_es$total_passengers[1]
+alpha <- 0.7
+
+# Initialize squared errors for exponential smoothing
+squared_errors_es <- numeric(length = nrow(training_data_es))
+
+# Update forecast and smoothing parameter for each observation
+for (i in 2:length(training_data_es$total_passengers)) {
+  actual <- training_data_es$total_passengers[i]
+  forecast <- alpha * actual + (1 - alpha) * forecast
+  squared_errors_es[i] <- (actual - forecast)^2
+}
+
+# Calculate MSE for Exponential Smoothing
+mse_es <- mean(squared_errors_es)
+
+# Print the MSE for Exponential Smoothing
+cat("Mean Squared Error (Exponential Smoothing):", mse_es, "\n")
+
+# Question 6 - Linear Regression Model
+# Filter the dataset for the time period from 2008 to 2018
+data_lr <- total_domestic_passengers %>%
+  filter(activity_period >= 200803 & activity_period <= 201803) %>%
+  select(activity_period, total_passengers)
+
+# Fit a simple linear regression model
+linear_regression_model <- lm(total_passengers ~ activity_period, data = data_lr)
+
+# Extract the coefficients
+intercept_lr <- coef(linear_regression_model)[1]
+slope_lr <- coef(linear_regression_model)[2]
+
+# Function to make predictions using the coefficients
+predict_passengers_lr <- function(year) {
+  return(intercept_lr + slope_lr * year)
+}
+
+# Initialize squared errors for linear regression
+squared_errors_lr <- numeric(length = nrow(data_lr))
+
+# Make predictions for each observation and calculate squared errors
+for (i in 1:nrow(data_lr)) {
+  actual <- data_lr$total_passengers[i]
+  prediction <- predict_passengers_lr(data_lr$activity_period[i])
+  squared_errors_lr[i] <- (actual - prediction)^2
+}
+
+# Calculate MSE for Linear Regression
+mse_lr <- mean(squared_errors_lr)
+
+# Print the MSE for Linear Regression
+cat("Mean Squared Error (Linear Regression):", mse_lr, "\n")
+
+# Question 7 - Compare MSE
+# Compare and comment on which model has the smallest MSE
+if (mse_es < mse_lr) {
+  cat("Exponential Smoothing Model has the smallest Mean Squared Error.\n")
+} else if (mse_lr < mse_es) {
+  cat("Linear Regression Model has the smallest Mean Squared Error.\n")
+} else {
+  cat("Both models have the same Mean Squared Error.\n")
+}
+
+```
+
+The Exponential Smoothing model, with an alpha of 0.7, has a Mean Squared Error (MSE) of 3,141,864,472, while the Linear Regression model has an MSE of 5,017,266,497. The Exponential Smoothing model outperforms the Linear Regression model in terms of forecasting accuracy, as it has a smaller MSE. This suggests that, based on the given data from 2008 to 2018, the Exponential Smoothing model provides a more accurate prediction of total passenger activity.

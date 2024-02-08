@@ -1,0 +1,150 @@
+---
+title: "Assignment 10"
+author: "nithyasarabudla"
+date: "2023-12-03"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load necessary libraries
+library(openintro)
+library(dplyr)
+library(caret)
+```
+# Question 1 
+
+## Confidence Interval:
+A confidence interval is a statistical range that provides an estimated range of values which is likely to include the true parameter of interest with a certain level of confidence. For example, if you calculate a 95% confidence interval for the mean of a population, it means that you are 95% confident that the true population mean falls within that interval. The width of the interval reflects the uncertainty associated with estimating the parameter from a sample.
+
+## Prediction Interval:
+A prediction interval is similar to a confidence interval but is specifically used for predicting individual future observations. It provides a range within which a future observation is expected to fall with a certain level of confidence. In other words, it accounts not only for the variability in estimating the mean (as in a confidence interval) but also for the variability in predicting a specific future data point.
+
+## Significance:
+
+Confidence Interval Significance: It provides a range for the likely values of a parameter, conveying the precision of the estimation. The higher the confidence level (e.g., 95%), the wider the interval, indicating a higher degree of certainty that the true parameter lies within that range.
+
+Prediction Interval Significance: It is crucial when making predictions for individual observations. A wider prediction interval implies more uncertainty in predicting specific outcomes, considering both variability in the data and the uncertainty in the model.
+
+## Multiple Linear Regression:
+Multiple linear regression is a statistical technique used to model the relationship between a dependent variable and two or more independent variables. In contrast to simple linear regression (which involves only one independent variable), multiple linear regression considers multiple predictors simultaneously. The model assumes that the relationship between the dependent variable and each independent variable is linear, and it estimates the coefficients that best fit the observed data.
+
+## Purpose:
+Modeling Complex Relationships: Multiple linear regression is employed when the relationship between the dependent variable and the predictors is too intricate to be captured adequately by a simple linear model.
+
+Predictive Modeling: It is used for making predictions and understanding how changes in the independent variables relate to changes in the dependent variable.
+
+Variable Importance: It helps identify the importance of each independent variable in explaining the variability in the dependent variable.
+
+Hypothesis Testing: The coefficients in the model can be tested for statistical significance, providing insights into which predictors are likely to have a genuine impact.
+
+```{r}
+# question 2
+# loading the data 
+data(ncbirths)
+# Summary statistics for each variable
+summary(ncbirths)
+# remove any rows from a data frame that contain missing values (NA)
+ncbirths <- na.omit(ncbirths)
+```
+
+
+```{r}
+# excluding non numerical values  
+numeric_cols <- sapply(ncbirths, is.numeric)
+numeric_data <- ncbirths[, numeric_cols]
+
+# Identify non-numeric columns
+non_numeric_cols <- sapply(ncbirths, is.factor)
+
+# Create a new dataset containing only non-numeric columns
+non_numeric_data <- ncbirths[, non_numeric_cols]
+
+# One-hot encode categorical variables
+non_numeric_data_encoded <- dummyVars("~ .", data = non_numeric_data) %>%
+  predict(newdata = non_numeric_data)
+
+# Combine numeric and encoded non-numeric datasets
+combined_data <- cbind(numeric_data, non_numeric_data_encoded)
+
+# Calculate the correlation matrix
+cor_matrix <- cor(combined_data, use = "complete.obs")
+print(cor_matrix)
+
+```
+
+variables such as 'mage' and 'fage' exhibit a high correlation of approximately 0.78, indicating potential multicollinearity. Similarly, the variables 'weeks' and 'premie.full term' demonstrate a correlation of around 0.73. Perfect negative correlation exists between 'lowbirthweight.low' and 'lowbirthweight.not low.'
+Binary indicators like 'mature.mature mom' and 'mature.younger mom' exhibit perfect negative correlation, suggesting redundancy.Similar perfect negative correlation is observed between 'marital.not married' and 'marital.married.'
+Anticipation of Fields Not Useful:
+Variables with perfect negative correlation, such as 'mature.mature mom' and 'mature.younger mom,' may not provide additional meaningful information.
+'marital.not married' and 'marital.married' variables are perfectly negatively correlated, indicating potential redundancy.
+
+Example of Fields Potentially Not Useful:
+Variables like 'mature.mature mom' and 'mature.younger mom,' or 'marital.not married' and 'marital.married,' might be candidates for exclusion to address multicollinearity and enhance model interpretability.
+
+```{r}
+# Question 3 
+# Build the multiple regression model
+model <- lm(weight ~ fage + mage + weeks + visits + gained + habit + marital + 
+                lowbirthweight + gender + mature + premie + whitemom, data = ncbirths)
+
+# Print a summary of the model
+summary(model)
+```
+
+R-squared is 0.6049, indicating that approximately 60.5% of the variance in birth weight is explained by the independent variables in the model.
+Residual standard error is 0.9126, representing the average amount by which the observed values differ from the predicted values.
+The F-statistic is 100.4 with a very low p-value (< 2.2e-16), suggesting that at least one of the predictors is significantly related to the response variable.
+fage, mage, visits, maritalmarried, matureyounger mom, and premiepremie have p-values greater than 0.05, suggesting that they are not statistically significant.
+Other coefficients, including intercept, have p-values less than 0.05 and are considered statistically significant.
+
+
+```{r}
+# Question 4 
+# Build a multiple regression model with all predictors
+mul_model <- lm(weight ~ fage + mage + weeks + visits + gained + habit + marital + lowbirthweight + gender + mature + premie + whitemom, data = ncbirths)
+
+# Perform backward stepwise elimination
+final_regression_model <- step(mul_model, direction = "backward", trace = 2)
+
+# Display the final model summary
+summary(final_regression_model)
+```
+
+Beginning with an initial model encompassing various predictors, each step involved the removal of the predictor with the highest p-value exceeding 0.05.In the first step, 'mage' was eliminated ( p = 0.975 )  followed by 'mature'(p=0.955)'visits' (p=0.914), 'premie' (p=0.758), 'marital' (p=0.130), 'habit' (p=0.045), and 'whitemom' (p=0.002) in subsequent steps. The final model retained significant predictors, namely 'fage' (p=0.275), 'weeks' (p<0.001), 'gained' (p=0.003), 'lowbirthweight' (p<0.001), and 'gender' (p<0.001). This selection was driven by a systematic reduction of predictors based on statistical significance. The model evaluation revealed a lower AIC for the final model, indicating improved model fit.
+
+```{r}
+# Question 5 
+# Defining a new set of observations for prediction
+new_observation <- data.frame(
+  fage = 40,
+  mage = 32,
+  mature = 'mature mom',
+  weeks = 42,
+  premie = 'full term',
+  visits = 12,
+  marital = 'married',
+  gained = 22,
+  lowbirthweight = 'not low',
+  gender = 'female',
+  habit = 'nonsmoker',
+  whitemom = 'white'
+)
+
+# Utilizing the final regression model to predict birth weight for the new observations with a prediction interval
+birth_weight_prediction <- predict(final_regression_model, newdata = new_observation, interval = 'prediction')
+
+# prints the predicted birth weight along with the 95% prediction interval for the new set of observations.
+print(birth_weight_prediction)
+
+```
+fit: This is the predicted birth weight for the new set of observations. In this case, the predicted birth weight is approximately 8.00.
+
+lwr (lower): This is the lower limit of the prediction interval. It indicates the lower boundary within which we expect the actual birth weight to fall with 95% confidence. In this instance, the lower limit is around 6.21.
+
+upr (upper): This is the upper limit of the prediction interval. It represents the upper boundary within which we expect the actual birth weight to fall with 95% confidence. Here, the upper limit is approximately 9.80.
+
+The predicted birth weight of 8.00, along with the prediction interval (6.21 to 9.80), provides a range of values that is expected to capture the true birth weight with 95% confidence. The wider the prediction interval, the greater the uncertainty associated with the prediction. In this case, the interval is relatively broad, suggesting some variability in the potential birth weight for the given set of new observations. 

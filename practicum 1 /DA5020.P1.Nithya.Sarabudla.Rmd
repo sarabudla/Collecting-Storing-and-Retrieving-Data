@@ -1,0 +1,283 @@
+---
+title: "Practicum 1"
+author: "Reina Conti, Maryanne Muchuki, Nithya Sarabudla"
+date: "2023-09-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(dplyr)
+```
+# Part 1
+
+## Question 1
+Dataframe created with four variables.
+```{r}
+doctor_df <- data.frame(
+  doctor_type = c("PCP", "Psychiatrist", "Surgeon", "Anesthesia"),
+  doctor_lastname = c("Smith", "Dame", "Jones", "Zayas"),
+  location = c("MA", "ME", "NH", "VT"),
+  AVG_Rating = c(7, 9, 8, 9)
+)
+print(doctor_df)
+```
+
+## Question 2
+Using the dataframe from Question 1, selecting row 1 and column 2 results in "Smith" being selected. Selecting rows 2 through 4 results in a 3 x 4 dataframe. Selecting the last column results in 7, 9, 8, and 9 being selected.
+```{r}
+# Row 1, column 2
+print(doctor_df[1,2])
+
+# Rows 2-4
+print(doctor_df[2:4,])
+
+# Last column
+print(doctor_df[,4])
+```
+
+## Question 3
+
+```{r}
+# scatter plot mpg vs. weight colored by engine shape
+ggplot(mtcars, aes(x = wt, y = mpg, color = factor(vs))) +
+  geom_point() +
+  labs(x = "Weight (1000 lbs)",
+       y = "MPG (Miles per Gallon)",
+       title = "Relationship Between Weight and MPG",
+       color = "Engine Type")
+```
+
+This scatterplot shows the relationship between the weight of the car and the mpg the car travels. Typically, heavier cars require more energy to move and sustain movement and this relationship is seen in the graph. Cars with higher mpg are on the lighter side while heavier cars are not as fuel efficient. The points are colored by engine shape. Heavier, less efficient cars have V-shaped engines, while lighter cars have straight engines.
+
+## Question 4
+We chose to look at the relationship between mpg and hp because they offer insight into energy consumption and engine efficiency. Hp is the horsepower of the engine or how well it is able to generate energy for acceleration or speed. Mpg is the fuel efficiency of the car or how far it is able to travel on a set amount of energy. The purpose of a pearson coefficient is to identify linear relationships between variables and highlight how strong the relationship is. The correlation between the two in this data set is -0.78 meaning the more powerful an engine is, the less fuel efficient it is. Cars that are able to accelerate more quickly use up more gasoline than less powerful cars. Because the value is close to -1, there is a strong negative correlation between the two. 
+```{r}
+mtcars %>% summarize(correlation = cor(hp, mpg))
+```
+
+# Part 2
+
+## Question 1
+
+Load CSV file 
+```{r}
+# Load CSV data into R environment
+admission_df <- read_csv("https://data.ny.gov/api/views/ngbt-9rwf/rows.csv")
+```
+
+
+## Question 2
+
+```{r}
+# Preparation steps
+
+# change column name
+colnames(admission_df)[which(colnames(admission_df) == 
+                               "County of Program Location")] <- "county_name"
+
+# Find sum of admissions for each program category
+sum_admissions <- admission_df %>% group_by(`Program Category`) %>%
+  summarize(`Sum Admissions` = sum(Admissions))
+sum_admissions
+
+# find mean of admissions
+avg = mean(admission_df$Admissions)
+# standard deviation
+sd = sd(admission_df$Admissions)
+
+# filter for within 3 standard deviations
+admission_filter <- admission_df %>% 
+  filter(Admissions < (avg + sd * 3) 
+       | Admissions > (avg - sd * 3))
+
+```
+According to the data, grouped by program category, there are a high number of admissions in Outpatient category followed by Crisis. The lowest number of admissions fall in the Specialized category. When we filtered the data for outliers, zero data points were removed from the dataframe. We noticed there were no factors in the dataset and no missing values.
+
+
+## Question 3
+Data is structured relationally into four tibbles. The county_code_df dataframe contains each county represented in the data and its corresponding county code. The NY code was modified by attaching a numeric label so each of the five counties with this code have a unique mapping. 
+```{r}
+# county df contains name of all counties and their respective county code
+county_codes <- data.frame(county_name = c("Albany",	"Allegany",	"Bronx", "Broome",
+"Cattaraugus", "Cayuga", "Chautauqua", "Chemung",
+"Chenango", "Clinton",  "Columbia", "Cortland",
+"Delaware", "Dutchess",	"Erie", "Essex",
+"Franklin", "Fulton", "Genesee", "Greene",
+"Hamilton",	"Herkimer", "Jefferson", "Kings",
+"Lewis", "Livingston", "Madison", "Monroe",
+"Montgomery", "Nassau", "New York",	"Niagara",
+"Oneida", "Onondaga", "Ontario", "Orange",
+"Orleans", "Oswego", "Otsego", "Putnam",
+"Queens", "Rensselaer", "Richmond",	"Rockland",
+"Saint Lawrence",	"Saratoga",	"Schenectady", "Schoharie",
+"Schuyler", "Seneca", "Steuben", "Suffolk",
+"Sullivan", "Tioga", "Tompkins", "Ulster",
+"Warren",	"Washington",	"Wayne", "Westchester",
+"Wyoming",	"Yates"),
+county_code = c("AL",	"AG",	"NY(1)", "BM",
+"CA", "CY", "CH", "CM",
+"CN", "CL",  "CO", "CR",
+"DE", "DU",	"ER", "ES",
+"FR", "FU", "GE", "GR",
+"HA",	"HE", "JE", "NY(2)",
+"LE", "LI", "MA", "MO",
+"MG", "NA", "NY(3)",	"NI",
+"ON", "OD", "OT", "OR",
+"OL", "OS", "OG", "PU",
+"NY(4)", "RE", "NY(5)",	"RO",
+"SL",	"SA",	"SC", "SH",
+"SY", "SE", "ST", "SU",
+"SV", "TI", "TO", "UL",
+"WR",	"WS",	"WA", "WE",
+"WY",	"YA"))
+```
+
+```{r}
+# Match with counties present in dataset
+county_code_df <- merge(admission_df, county_codes, by = "county_name") %>%
+  select(county_name, county_code) %>%
+  # keep one instance of each county name
+  distinct(county_name, .keep_all = TRUE)
+
+```
+
+The program_df contains each program category with a unique numeric code.
+```{r}
+# Numeric program category code dataframe
+program_df <- admission_df %>% 
+  # keep one instance of each program
+  distinct(`Program Category`) %>%
+  # create unique numeric code for each program
+  mutate(program_code = row_number())
+
+```
+
+The substance_df contains each primary substance group with a unique numeric code.
+```{r}
+# Numeric substance code dataframe
+substance_df <- admission_df %>% 
+  # keep once instance of each substance group
+  distinct(`Primary Substance Group`) %>%
+  # create unique numeric code for each group
+  mutate(substance_code = row_number())
+
+```
+
+The admissions_data dataframe contains all information on reported admissions with data included in previous dataframes replaced with their respective codes.
+```{r}
+# admissions data dataframe
+admissions_data <- admission_df %>%
+  # replace county name with county code
+  left_join(county_code_df, by = "county_name") %>%
+  mutate(county_name = county_code) %>%
+  select(-county_code) %>%
+  # replace substance group with group code
+  left_join(substance_df, by = "Primary Substance Group") %>%
+  mutate(`Primary Substance Group` = substance_code) %>%
+  select(-substance_code) %>%
+  # replace program category with program code
+  left_join(program_df, by = "Program Category") %>%
+  mutate(`Program Category` = program_code) %>%
+  select(-program_code)
+  
+```
+
+## Question 4
+This function derives the total number of admissions per year for a dataset and displays the result in a line chart with the highest admission year labeled. 
+```{r}
+# function that derives total number of admissions per year and displays result in a line chart
+annualAdmissions <- function(admissions_data) {
+  # find max year for admissions numbers
+  highest_year <- admissions_data %>%
+    group_by(Year) %>%
+    summarize(total = sum(Admissions)) %>%
+    filter(total == max(total)) %>%
+    select(Year, total)
+  
+  # plot admissions per year
+  admissions_data %>%
+    group_by(Year) %>%
+    # find total admissions per year
+    summarize(total_admissions = sum(Admissions)) %>%
+    ggplot(aes(x = Year, y = total_admissions)) +
+    geom_line() +
+    labs(
+      y = "Total Admissions",
+      title = "Total Chemical Dependence Treatment Admissions (2007-2021)"
+    ) +
+    # add label for max year admissions
+    annotate(geom="text", x = highest_year$Year, 
+                                   y = (highest_year$total + 5000),
+                                   label = "highest admissions") +
+    annotate(geom="point", x = highest_year$Year, 
+                                   y = highest_year$total)
+}
+```
+
+```{r}
+# apply function to admissions dataset to generate plot
+annualAdmissions(admissions_data)
+```
+
+The chart depicts the total number of reported admissions to chemical dependence treatment programs throughout New York State each year from 2007 to 2021. The highest total admissions reached in a calendar year occurred in 2009 when 311,717 admissions were reported. There was a rise in admissions from 2007 to 2009, but after 2009 the admissions dropped steadily until 2020 where a sharper decline was recorded from admissions in 2019. 
+
+## Question 5
+
+```{r}
+# find admissions per county
+sum_admissions <- admissions_data %>%
+  # join with county code tibble
+  left_join(county_code_df, by = c("county_name" = "county_code")) %>%
+  mutate(county_name = county_name.y) %>%
+  select(-'county_name.y') %>%
+  group_by(county_name) %>%
+  summarize(total = sum(Admissions))
+
+# total of all counties
+total_admissions <- sum(sum_admissions$total)
+```
+
+```{r}
+# graph top 5 percentages
+sum_admissions %>%
+  # add percentage column
+  mutate(percentage = total/total_admissions) %>%
+  # keep top 5
+  top_n(5, percentage) %>%
+  ggplot(aes(x = county_name, y = percentage)) +
+  geom_col(fill = "lightblue") +
+  labs(
+    x = "County",
+    y = "Percentage of Admissions",
+    title = "Top 5 Counties for Percentage of Admissions"
+  )
+
+```
+
+The counties that compose the top 5 for percentage of admissions are more densely populated than other counties in New York State. Four of the counties in the top 5 are located in New York City in Bronx (The Bronx), Kings (Brooklyn), New York (Manhattan), and Queens. Suffolk county meanwhile is located on Long Island which juts off the side of NYC. When the percentages were calculated using just the county codes rather than names the percentages were skewed even further towards NYC as 4 of the top 5 counties have the same county code (NY), this was avoided by added unique numeric quantifiers to the NY code in the county codes tibble. The highest number of admissions came from New York (Manhattan) which can be attributed both to population and access the treatment facilities.
+
+## Question 6
+```{r}
+# filter for rehab data using regular expression
+rehab_df <-admissions_data %>%
+  filter(grepl("Rehab|Rehabilitation", `Service Type`))
+
+# which substance is most prominent among each age group
+rehab_df %>%
+  group_by(`Age Group`, `Primary Substance Group`) %>%
+  summarize(Admissions = n()) %>%
+  arrange(desc(Admissions)) %>%
+  slice(1) %>%
+  # replace numeric code with name
+  left_join(substance_df, by = c("Primary Substance Group" = "substance_code")) %>%
+  mutate(`Primary Substance Group` = `Primary Substance Group.y`) %>%
+  select('Age Group', 'Primary Substance Group', Admissions)
+
+```
+According to the admissions data for rehab facilities, marijuana is the most prominent substance in age groups 18 through 24 and under 18. There is consistent use of alcohol in most age groups as depicted. These substances are the most accessible to those who fall within these age groups so it makes sense these are the most prominent.
+

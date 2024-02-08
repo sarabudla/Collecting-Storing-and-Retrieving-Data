@@ -1,0 +1,283 @@
+---
+title: "Practicum 2"
+author: "Maryanne Muchuki, Nithya Sarabudla, Reina Conti"
+date: "2023-11-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Pre Work
+Create database and look at what data in contained in the tables. 
+```{r, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(RSQLite)
+```
+
+```{r}
+#create database with three tables from csv files from command line
+# sqlite> CREATE TABLE business (
+#    ...> ims_org_id TEXT PRIMARY KEY,
+#    ...> business_name TEXT,
+#    ...> ttl_license_beds INTEGER,
+#    ...> ttl_census_beds INTEGER,
+#    ...> ttl_staffed_beds INTEGER,
+#    ...> bed_cluster_id INTEGER);
+
+# sqlite> CREATE TABLE bed_fact (
+#    ...> ims_org_id TEXT,
+#    ...> bed_id INTEGER,
+#    ...> license_beds INTEGER,
+#    ...> census_beds INTEGER,
+#    ...> staffed_beds INTEGER);
+
+# sqlite> CREATE TABLE bed_type (
+#    ...> bed_id INTEGER PRIMARY KEY,
+#    ...> bed_code TEXT,
+#    ...> bed_desc TEXT)
+#    ...> ;
+
+# sqlite> .separator ","
+# sqlite> .import business.csv business
+# sqlite> .import bed_type.csv bed_type
+# sqlite> .import bed_fact.csv bed_fact
+```
+
+Connect to database.
+```{r}
+db <- dbConnect(SQLite(),
+                dbname = "DA5020/practicum2.db")
+```
+See tables present.
+```{r}
+dbListTables(db)
+```
+
+```{r, include=FALSE}
+# load in data tables for outlier analysis
+business_data_query <- "SELECT *
+FROM business"
+business_df <- dbGetQuery(db, business_data_query)
+bed_fact_data_query <- "SELECT * FROM bed_fact"
+bed_fact_df <- dbGetQuery(db, bed_fact_data_query)
+```
+
+For this analysis it is not necessary to remove outliers as they are crucial for determining which hospitals have more beds in different categories than others which is what we are looking for. In this analysis we are looking for hospitals that are in the top ten in terms of numbers of both ICU and SICU beds. We are looking for hospitals with a bed_id corresponding to either 4 for ICU beds or 15 for SICU beds. The number of beds in these categories will be compared for hospitals in the database. 
+```{r, include=FALSE}
+# find outliers using mean and standard deviation
+mean_lb <- mean(bed_fact_df$license_beds)
+sd_lb <- sd(bed_fact_df$license_beds)
+
+bed_fact_outliers <- filter(bed_fact_df,
+  license_beds > mean_lb + sd_lb * 3 | license_beds < mean_lb - sd_lb * 3)
+
+mean_ttl_lb <- mean(business_df$ttl_license_beds)
+sd_ttl_lb <- sd(business_df$ttl_license_beds)
+mean_ttl_cb <- mean(business_df$ttl_census_beds)
+sd_ttl_cb <- sd(business_df$ttl_census_beds)
+mean_ttl_sb <- mean(business_df$ttl_staffed_beds)
+sd_ttl_sb <- sd(business_df$ttl_staffed_beds)
+
+business_outliers <- filter(business_df,
+                            ttl_license_beds > mean_ttl_lb + sd_ttl_lb * 3 |
+                              ttl_license_beds < mean_ttl_lb - sd_ttl_lb * 3)
+```
+
+```{r, include=FALSE}
+# Visualization of ttl_license beds vs ttl_census beds. There is a linear relationship between licensed beds and census beds. Most hospitals fall below the allowed number of beds with their actual count of available beds. 
+ggplot(business_df, aes(x = ttl_license_beds, y = ttl_census_beds)) +
+  geom_point(color = "lightblue")
+```
+
+
+## Question 1
+In the bed_type table "bed_id" serves as the primary key (PK), which qualifies as a dimension, categorizing and identifying different types of beds. The other two variables, "bed_code" and "bed_desc," are attributes or dimensions that provide additional information about each bed type. Therefore, "bed_id" and "bed_code" are dimensions, while "bed_desc" is an attribute dimension. In the bed_type table none of the variables are explicitly identified as a fact. Facts typically represent numerical data that can be measured, aggregated, or analyzed, whereas the variables in this table are all character (text) data.
+```{r}
+bed_table_query <- "SELECT *
+FROM bed_type
+LIMIT 5"
+
+bed_table_5 <- dbGetQuery(db, bed_table_query)
+print(bed_table_5)
+```
+
+In the business table the primary key is "ims_org_id" which is a dimension variable for the data table. The "business_name" is also a dimension variable as it is used for identification and the "bed_cluster_id" is also a dimension for the table as it is categorical. The "ttl_license_beds", "ttl_census_beds", and "ttl_staffed_beds" variables are not dimension variables as they represent numerical data relating to bed counts and utilization in healthcare organizations. These variables are facts for the table. 
+```{r, warning=FALSE}
+business_query <- "SELECT *
+FROM business
+LIMIT 5"
+
+business_5 <- dbGetQuery(db, business_query)
+print(business_5)
+```
+
+## Question 2
+In the bed_fact table we have "license_beds," "census_beds," and "staffed_beds" as facts. These facts represent the total counts of licensed beds, census beds, and staffed beds for specific combinations of "ims_org_id" and "bed_id."
+
+"ims_org_id": This variable acts as both a dimension and a foreign key. It serves to categorize and identify healthcare organizations (hospitals) while also establishing connections with the "bedfact" and "bed type" dimension tables to provide comprehensive information about these organizations.
+
+"bed_id": Similar to "ims_org_id," this variable serves as both a dimension and a foreign key. It categorizes and identifies individual beds within hospitals and is linked to the "bed type" dimension table to offer insights into different bed types.
+```{r, warning=FALSE}
+bed_fact_query <- "SELECT *
+FROM bed_fact
+LIMIT 5"
+
+bed_fact_5 <- dbGetQuery(db, bed_fact_query)
+print(bed_fact_5)
+```
+
+## Question 3a
+1. List of top 10 hospitals by the total of ICU or SICU license beds. 
+```{r}
+# find hospitals with ICU or SICU
+query_1 <- "SELECT business_name AS hospital_name, 
+SUM(license_beds) as total_license_beds
+FROM business as b
+LEFT JOIN bed_fact as bf ON b.ims_org_id = bf.ims_org_id
+WHERE bed_id = 4 OR bed_id = 15
+GROUP BY business_name
+ORDER BY total_license_beds DESC
+LIMIT 10;
+"
+
+icu_license <- dbGetQuery(db, query_1)
+print(icu_license)
+```
+2. List of top 10 hospitals by total of ICU or SICU census beds.
+```{r}
+# find hospitals with ICU or SICU
+query_2 <- "SELECT business_name AS hospital_name, 
+SUM(census_beds) AS total_census_beds
+FROM business as b
+LEFT JOIN bed_fact as bf ON b.ims_org_id = bf.ims_org_id
+WHERE bed_id = 4 OR bed_id = 15
+GROUP BY business_name
+ORDER BY total_census_beds DESC
+LIMIT 10;
+"
+
+icu_census <- dbGetQuery(db, query_2)
+print(icu_census)
+```
+3. List of top 10 hospitals by total of ICU or SICU staffed beds. 
+```{r}
+# find hospitals with ICU or SICU
+query_3 <- "SELECT business_name AS hospital_name, 
+SUM(staffed_beds) AS total_staffed_beds
+FROM business as b
+LEFT JOIN bed_fact as bf ON b.ims_org_id = bf.ims_org_id
+WHERE bed_id = 4 OR bed_id = 15
+GROUP BY business_name
+ORDER BY total_staffed_beds DESC
+LIMIT 10;
+"
+
+icu_staffed <- dbGetQuery(db, query_3)
+print(icu_staffed)
+```
+```{r}
+# find which hospitals appear on all three lists
+common_hospitals_1 <- merge(merge(icu_license, icu_census, by = "hospital_name"), 
+                         icu_staffed, by = "hospital_name")
+common_hospitals_1
+```
+
+## Question 3b
+Phoenix Children's Hospital leads with the highest number of license beds at 247 followed by the University of Maryland Medical Center at 220 beds. Shands Hospital at the University of Florida has the highest number of census beds at 167 followed by Dallas County Hospital Association at 145. Vidant Medical Center has the most staffed beds at 203 followed by Rady Childrens Hospital and Health Center with 200 beds. Several points to note are that Shands Hospital at the University of Florida has 167 census beds and 167 staffed beds. Dallas County Hospital appears on both the census and licensed beds lists. Emory University Hospital has 169 license beds and 169 staffed beds. The University of Maryland Medical Center and Vidant Medical Center appear on all three lists. 
+The University of Maryland Medical Center has its presence on both the total license beds and total census beds lists, indicating a large bed capacity of 220 and high occupancy at 127,  Vidant Medical Center, on the other hand, has its presence on both the total license beds and total staffed beds lists, signifying a capacity of 204 total license beds and staffed beds at 203, Both hospitals also have 171 and 203 staffed beds, respectively. Thus, making them good candidates for the intervention pilot program.
+
+
+## Question 4a
+1. List of top 10 hospitals with both ICU and SICU license beds.
+```{r}
+# license beds for hospitals with ICU and SICU beds
+query_4 <- "SELECT
+    business_name AS hospital_name,
+    total_license_beds
+FROM (
+  SELECT
+    business_name,
+    GROUP_CONCAT(bed_id) AS all_bed_id,
+    SUM(license_beds) AS total_license_beds
+    FROM business as b
+    LEFT JOIN bed_fact as bf ON b.ims_org_id = bf.ims_org_id
+    WHERE bed_id = 4 OR bed_id = 15
+    GROUP BY business_name
+)
+WHERE all_bed_id LIKE '%4%' AND all_bed_id LIKE '%15%' 
+ORDER BY total_license_beds DESC
+LIMIT 10;"
+
+both_license <- dbGetQuery(db, query_4)
+print(both_license)
+```
+
+2. List of top 10 hospitals with both ICU and SICU census beds.
+```{r}
+# census beds for hospitals with ICU and SICU beds
+query_5 <- "SELECT
+    business_name AS hospital_name,
+    total_census_beds
+FROM (
+  SELECT
+    business_name,
+    GROUP_CONCAT(bed_id) AS all_bed_id,
+    SUM(census_beds) AS total_census_beds
+    FROM business as b
+    LEFT JOIN bed_fact as bf ON b.ims_org_id = bf.ims_org_id
+    WHERE bed_id = 4 OR bed_id = 15
+    GROUP BY business_name
+)
+WHERE all_bed_id LIKE '%4%' AND all_bed_id LIKE '%15%' 
+ORDER BY total_census_beds DESC
+LIMIT 10;"
+
+both_census <- dbGetQuery(db, query_5)
+print(both_census)
+```
+
+3. List of top 10 hospitals with both ICU and SICU staffed beds.
+```{r}
+# staffed beds for hospitals with ICU and SICU beds
+query_6 <- "SELECT
+    business_name AS hospital_name,
+    total_staffed_beds
+FROM (
+  SELECT
+    business_name,
+    GROUP_CONCAT(bed_id) AS all_bed_id,
+    SUM(staffed_beds) AS total_staffed_beds
+    FROM business as b
+    LEFT JOIN bed_fact as bf ON b.ims_org_id = bf.ims_org_id
+    WHERE bed_id = 4 OR bed_id = 15
+    GROUP BY business_name
+)
+WHERE all_bed_id LIKE '%4%' AND all_bed_id LIKE '%15%' 
+ORDER BY total_staffed_beds DESC
+LIMIT 10;"
+
+both_staffed <- dbGetQuery(db, query_6)
+print(both_staffed)
+```
+
+```{r}
+# find which hospitals appear on all three lists
+common_hospitals_2 <- merge(merge(both_license, both_census, 
+                                  by = "hospital_name"), 
+                                both_staffed, by = "hospital_name")
+common_hospitals_2
+```
+
+## Question 4b
+Looking at hospitals that have sufficient volume of both ICU and SICU beds as opposed to one or the other leads us to recommend the University of Maryland Medical Center as the best choice for the pilot intervention program. Not only was this hospital located in the top ten for all hospitals with ICU and/or SICU license, census, and staffed beds, they are the top hospital for staffed and licenese beds among those that have both ICU and SICU beds. This hospital would make an excellent pilot site as they contain sufficient resources and rank highly in all measured attributes. A second choice contender that could also be considered is Shands Hospital at the University of Florida as they are present in the top ten for all categories except total license beds for hospitals that have ICU and/or SICU beds. Both these hospitals will be cost effective choices and the influx of nurses to these system will improve the nurse to patient ratios. 
+
+
+```{r, include=FALSE}
+#Disconnect from database. 
+dbDisconnect(db)
+```
+
+

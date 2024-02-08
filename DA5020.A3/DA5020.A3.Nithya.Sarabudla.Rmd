@@ -1,0 +1,128 @@
+---
+title: "DA5020.A3.Nithya.Sarabudla"
+author: "nithyasarabudla"
+date: "2023-09-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+```
+
+# question 2
+```{r}
+#Load the data from the CSV file into the tripdata_df dataframe
+tripdata_df <-read.csv("2018_Green_Taxi_Trip_Data.csv")
+
+# Display the dimensions (number of rows and columns) of the dataframe
+dim(tripdata_df)
+# Provide a summary of the dataframe's structure and data types
+glimpse(tripdata_df) 
+# Generate a summary of the statistics for the dataframe's numeric columns
+summary(tripdata_df)
+
+# Count the occurrences of missing values in the dataframe
+count(tripdata_df, "NA")
+```
+
+# question 3
+```{r}
+# Calculating the frequency of missing values in each column
+missing_values <- colSums(is.na(tripdata_df))
+print(missing_values)
+```
+This code helps us see how many times data is missing in our dataset. It helps us find columns with a lot of missing data.
+
+```{r}
+head(tripdata_df$lpep_dropoff_datetime)
+glimpse(tripdata_df$lpep_pickup_datetime)
+```
+From the above it's noticeable that in the 'lpep_dropoff_datetime' and 'lpep_pickup_datetime' variables, the date corresponds to January. However, we downloaded the CSV file intending to cover the month of February, and the time format is also inconsistent.
+
+```{r}
+summary(tripdata_df$tip_amount)
+summary(tripdata_df$trip_duration_seconds)
+```
+In the above code summary statistics and visualizations is used,to identify outliers or invalid values in the tip_amount and  trip_duration_seconds
+
+# question 4 
+```{r}
+data <- as.data.frame(tripdata_df$trip_distance) 
+histogram <- ggplot(data, aes(x = tripdata_df$trip_distance)) +
+  geom_histogram()+
+   scale_y_log10()+
+  labs(x = "Trip distance in miles ", title= "histogram showing trip_distance")
+histogram
+```
+
+The data is skewed,the histogram indicates that the vast majority of trips are less than 75 miles in distance, with a significant portion even falling between 0 and 25 miles.
+
+# question 5
+
+```{r}
+
+# mean and standard deviation of trip_distance
+mean_trip_distance <- mean(tripdata_df$trip_distance)
+sd_trip_distance <- sd(tripdata_df$trip_distance)
+
+# mean and standard deviation of tip_amount 
+mean_tip_amount <- mean(tripdata_df$tip_amount)
+sd_tip_amount <- sd(tripdata_df$tip_amount)
+
+# outlier threshold oftip_amount and trip_distance
+threshold_tip_amount <- 3 * sd_tip_amount
+threshold_trip_distance <- 3 * sd_trip_distance
+
+# Identifing outliers in trip_distance
+outliers_trip_distance <- tripdata_df$trip_distance < (mean_trip_distance - threshold_trip_distance) | tripdata_df$trip_distance > (mean_trip_distance + threshold_trip_distance)
+
+# Identifing outliers in tip_amount 
+outliers_tip_amount <- tripdata_df$tip_amount < (mean_tip_amount - threshold_tip_amount) | tripdata_df$tip_amount > (mean_tip_amount + threshold_tip_amount)
+
+# Counting the number of outliers
+num_of_tip_amount_outliers <- sum(outliers_tip_amount)
+print(num_of_tip_amount_outliers)
+num_of_trip_distance_outliers <- sum(outliers_trip_distance)
+print(num_of_trip_distance_outliers)
+
+# removing the outlier tip_amount from the data
+tripdata_df <- tripdata_df[!outliers_tip_amount, ]
+
+```
+From the above code outliers detected in tip_amount and trip_distance variable are 14444 and 20953.
+
+# question 6
+```{r}
+# Filter trip_distance and removing the outliers
+filtered_data <- tripdata_df[!outliers_trip_distance, ]
+
+# Create a bar chart of trip_distance by payment_type
+ggplot(filtered_data, aes(x = payment_type, y=frequency(payment_type))) +geom_col(color="blue") +ylab("counts") +xlab("payment type") + ggtitle("The frequency of the payment types") 
+```
+
+
+# question 7
+
+We can handle the missing data by 
+
+1.Filling in the missing values with estimated or calculated values with the mean/median/most frequent value of the respective column.
+
+2.Deleting the rows that contains missing values.
+
+There are only three missing values in the "trip_type" column out of a total of 1,048,575 values. While one solution is to remove these three rows, it may not significantly affect the dataset since it's a very small fraction. However, considering that nearly 99% of the values are equal to 1, we could alternatively choose to impute these three missing values with the value 1.
+```{r}
+# checking the count of the missing values in "trip_type" column
+sum(is.na(tripdata_df$trip_type))
+# "trip_type" column by replacing the NA values with the value 1
+tripdata_df$trip_type[is.na(tripdata_df$trip_type)] <- 1
+```
+
+In the Column "ehail_fee" the  entire column is of NA values. Therefore the entire column can be dropped.
+```{r}
+# removing the entire column of NA values in ehail_fee
+tripdata_df <- within(tripdata_df, rm('ehail_fee'))
+```
+

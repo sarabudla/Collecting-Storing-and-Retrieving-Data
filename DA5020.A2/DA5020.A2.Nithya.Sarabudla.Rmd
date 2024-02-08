@@ -1,0 +1,82 @@
+---
+title: "DA5020.A2.Nithya.Sarabudla"
+author: "nithyasarabudla"
+date: "2023-09-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+data("msleep")
+```
+## question 1 
+(2)  "msleep" dataset contains 83 rows and 11 variables. The dataset contains the common name, taxonomic rank, vore, order,the conservation status of the mammal,  sleep times and weights for a set of mammals. There is some missing data in the msleep dataset.
+
+## question 2 
+```{r}
+# Calculating the proportion of each category of vore as a percentage
+category_vore <- msleep %>%
+  group_by(vore) %>%
+  summarize(count = n()) %>%
+  mutate(proportion = count / sum(count) * 100)
+# visualizing the results using a barchart
+ggplot(category_vore, aes(x = vore, y = proportion)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Proportion of each category of vore ",
+    x = "Vore",
+    y = "proportions"
+  )
+```
+
+In the bargraph herbivores has the highest percentage and insectivores has the lowest percentage. 
+
+## question 3
+```{r}
+# Filtering the data to extract data for just omnivores
+filtered_data = filter(msleep, vore=="omni")
+# calculating the mean sleep_total for that group
+ summarize(filtered_data, mean( sleep_total))
+```
+
+## question 4
+
+```{r}
+ggplot(msleep, aes(x = bodywt, y = brainwt)) +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(
+    x = "bodywt",
+    y = "brainwt",
+    title = "  Scatterplot of bodywt vs brainwt"
+  )
+```
+
+The graph shows the positive correlation.
+
+## question 5
+```{r}
+# Pearson correlation coefficient
+pearson_cor<- cor(msleep$bodywt, msleep$brainwt, method = "pearson", use="complete.obs")
+pearson_cor
+```
+
+From the results bodywt and brainwt are highly correlated. The results support the original assumptions from question 4
+
+## question 6 
+```{r}
+mean_sleep <- mean(msleep$sleep_total)
+median_sleep <- median(msleep$sleep_total)
+sd <- sd(msleep$sleep_total)
+msleep$z <- abs((mean_sleep-msleep$sleep_total)/sd)
+outliners <- msleep[which(msleep$z >1.5),]
+outliners_st <- outliners[, c("name", "sleep_total")]
+print(outliners_st)
+```
+
+
+
+

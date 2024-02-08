@@ -1,0 +1,145 @@
+---
+title: "Bonus assignment"
+author: "nithyasarabudla"
+date: "2023-11-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(dplyr)
+library(caret)
+```
+
+# Question 1 
+```{r}
+# Load the diabetes dataset “diabetes.csv”
+diabetes_dataset <- read.csv("diabetes-1.csv")
+#inspect the data and gather any relevant summary statistics
+str(diabetes_dataset)
+head(diabetes_dataset)
+summary(diabetes_dataset)
+glimpse(diabetes_dataset)
+```
+
+# Question 2 
+```{r}
+# Select the explanatory variables for normalization (excluding 'Outcome')
+explanatory_vars <-diabetes_dataset[, c("Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "DiabetesPedigreeFunction", "Age")]
+
+# Use the preProcess function with "range" method for min-max normalization
+preproc_range <- preProcess(explanatory_vars, method = c("range"))
+
+# Apply the normalization transformation
+normalized_explanatory <- predict(preproc_range, explanatory_vars)
+
+# Combine the normalized explanatory variables with the 'Outcome' variable
+normalized_dat_range <- cbind(normalized_explanatory, Outcome = diabetes_dataset$Outcome)
+
+summary(normalized_dat_range)
+```
+
+# Question 3 
+```{r}
+# Set the seed for reproducibility
+set.seed(123)
+
+# Selecting only the explanatory variables and 'Outcome' for the split
+data_for_split <- normalized_dat_range[, c("Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "DiabetesPedigreeFunction", "Age", "Outcome")]
+
+# Create an 80/20 split
+split_index <- createDataPartition(data_for_split$Outcome, p = 0.8, list = FALSE)
+
+# Create training and test sets
+train_data <- data_for_split[split_index, ]
+test_data <- data_for_split[-split_index, ]
+
+# Print the dimensions of the training and test sets
+cat("Training set size:", nrow(train_data), "\n")
+cat("Test set size:", nrow(test_data), "\n")
+
+```
+
+# Question 4
+```{r}
+euclidean_dist <- function(point1, point2) {
+  sqrt(sum((point1 - point2)^2))
+}
+
+knn_predict <- function(train_data, test_data, k) {
+  predictions <- numeric(nrow(test_data)) 
+
+  for (i in seq_along(predictions)) {
+  
+    distances <- apply(train_data[, -9], 1, function(train_point) euclidean_dist(test_data[i, -9], train_point))
+   
+    k_near_neighbors <- order(distances)[1:k]
+   
+    neighbor_outcomes <- train_data$Outcome[k_near_neighbors]
+   
+    predictions[i] <- ifelse(sum(neighbor_outcomes == 1) > sum(neighbor_outcomes == 0), 1, 0)
+  }
+  return(predictions)
+}
+
+```
+
+# Question 5 
+```{r}
+predictions <- knn_predict(train_data, test_data, k = 5)
+
+predictions <- as.factor(predictions)
+test_data$Outcome <- as.factor(test_data$Outcome)
+
+confusion_matrix <- confusionMatrix(predictions, test_data$Outcome)
+
+print(confusion_matrix$table)
+```
+
+True Positives (TP): The model predicted 25 instances where the actual outcome is 1 (positive).
+True Negatives (TN): The model predicted 90 instances where the actual outcome is 0 (negative).
+False Positives (FP): The model predicted 27 instances as positive when the actual outcome is 0.
+False Negatives (FN): The model predicted 11 instances as negative when the actual outcome is 1.
+
+The KNN model demonstrated an accuracy of 75.16%, with a sensitivity of 69.44% and specificity of 76.92%. It accurately predicted 25 positive and 90 negative instances but generated 27 false positives and 11 false negatives, resulting in a precision of 48.08%. The F1 score, balancing precision and recall, stood at 56.76%. The model excelled in identifying negative cases but showed room for improvement in precision.
+
+# Question 6 
+```{r}
+# Initialize vectors to store accuracy and confusion matrices for each k
+accuracies <- numeric(5)
+confusion_matrices <- list()
+
+# Perform experiment with different values of k
+for (k_value in c(3, 5, 7, 9, 11)) {
+  # Make predictions on the test set using knn_predict function
+  predictions <- knn_predict(train_data, test_data, k = k_value)
+  
+  # Convert predictions and actual outcomes to factors
+  predictions <- as.factor(predictions)
+  test_data$Outcome <- as.factor(test_data$Outcome)
+  
+  # Build confusion matrix
+  confusion_matrix <- confusionMatrix(predictions, test_data$Outcome)
+  
+  # Store accuracy and confusion matrix
+  accuracies[k_value] <- confusion_matrix$overall["Accuracy"]
+  confusion_matrices[[as.character(k_value)]] <- confusion_matrix$table
+  
+  # Print confusion matrix for the current k
+  cat("Confusion Matrix for k =", k_value, ":\n")
+  print(confusion_matrix$table)
+  cat("\n")
+}
+
+# Find the value of k that produced the most accurate predictions
+best_k <- which.max(accuracies)
+cat("The value of k that produced the most accurate predictions:", best_k, "\n")
+
+```
+
+The value of k that produced the most accurate predictions is k = 3. It achieved the highest accuracy among the tested values of k. The confusion matrix for k = 3 shows 88 true negatives, 28 true positives, 24 false positives, and 13 false negatives.
+

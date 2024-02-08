@@ -1,0 +1,97 @@
+---
+title: "DA5020.A4.Nithya.Sarabudla"
+author: "nithyasarabudla"
+date: "2023-10-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(lubridate)
+tripdata_df <-read.csv("2018_Green_Taxi_Trip_Data.csv")
+```
+# Bonus(2)
+```{r}
+# Split the 'lpep_pickup_datetime' column in 'tripdata_df' by space (' ') and extract the date portion
+date <- str_split(tripdata_df$lpep_pickup_datetime, ' ', simplify = TRUE)[, 1]
+# # Use 'table(date)' to count occurrences, 'which.max()' to find the date with the max count, 'names()' to retrieve it, and 'max(table(date))' to get the max count.
+c(names(which.max(table(date))), max(table(date)))
+```
+On 2/2/2018, 33953 trips are occured on that day. It is unusual because 33953 trips are lot in one day.
+
+# Question 1
+```{r}
+#Summarize the 'tripdata_df' dataset to get an overview of its contents.
+summary(tripdata_df)
+# Create a list of column names ('trip_type', 'payment_type', 'VendorID') that we want to convert to factors.
+con_to_factor <- c("trip_type", "payment_type", "VendorID")
+# Use the 'lapply' function to convert the specified columns in 'tripdata_df' to categorical factors.
+datatype_to_factor <- lapply(tripdata_df[con_to_factor], factor)
+
+```
+
+# Question 2
+```{r}
+# Counting the frequencies of trip_type
+tripdata_df %>% count(trip_type)
+# Counting the frequencies of payment_type
+tripdata_df %>% count(payment_type)
+```
+From the tables above, the most common way that people hail a cab is by street-hail represented as 1 and the most common way that people pay for trip is by credit card represented as 1.
+
+# Question 3
+```{r}
+# Extract rows with pickup dates in February using a regular expression pattern.
+feb <- (str_match(tripdata_df$lpep_pickup_date, '^2/.+/\\d{4}'))
+# Create a new data frame 'feb_date' containing only the rows where 'feb' is not NA.
+feb_date <- subset(tripdata_df, !is.na(feb))
+
+feb_date %>% 
+  ggplot(aes(x=reorder(feb, +as.Date(feb)))) + 
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+From the above graph, the trips are ranging from 28000 to 35000 from 2/1/2018 to 2/9/2018 and there is sudden drop of trips after 2/9/2018. 
+
+# Question 4 
+```{r}
+# Define a function 'HourOfDay' that extracts the hour from a timestamp in 'YYYY-MM-DD HH:MM:SS' format.
+# It uses regular expression matching to split the timestamp and then extracts the first two characters (the hour part).
+HourOfDay <- function(x){
+  match <- str_match(x, "(.*\\s)((.*):.*)")
+  hour <- substr(match[,4], 1, 2)
+  return(hour)
+}
+# The function takes a timestamp as input and returns the hour as a character.
+timestamp <- "2020-02-01 11:10:25"
+hour <- HourOfDay(timestamp)
+print(hour)
+```
+
+# Question 5 
+```{r}
+# Modify the 'tripdata_df' data frame by adding a new column 'lpep_pickup_hour.'
+# The 'HourOfDay' function is used to extract the hour, and 'as.integer' is used to ensure it's stored as an integer.
+tripdata_df <- tripdata_df %>% 
+  mutate(lpep_pickup_hour=as.integer(HourOfDay(lpep_pickup_datetime)))
+
+head(tripdata_df)
+```
+
+# Question 6
+```{r}
+# Calculate the median trip distance for each hour of the day.
+distance_hr <- tripdata_df %>% group_by(lpep_pickup_hour) %>% summarise(med_trip_dist_hr=median(trip_distance))
+# Arrange the data frame by 'lpep_pickup_hour' and Create a bar plot to visualize median trip distance by pickup hour.
+
+distance_hr %>% arrange() %>% ggplot(aes(x=lpep_pickup_hour, y=med_trip_dist_hr)) + geom_bar(stat='identity')
+```
+
+The plot above illustrates the relationship between the median trip distance and the time of day in a 24-hour format. It's noticeable that there is a noticeable increase in median trip distance during the hours of 5 AM and 6 AM, suggesting that trips taken during these hours tend to cover a greater distance compared to other times of the day.
+
+

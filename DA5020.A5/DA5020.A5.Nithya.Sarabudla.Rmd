@@ -1,0 +1,119 @@
+---
+title: "DA5020"
+author: "nithyasarabudla"
+date: "2023-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 1 
+```{r}
+library(XML)
+library(RCurl)
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(httr)
+
+# Load the XML data directly from the URL below into a data frame 
+url <- "http://www.senate.gov/general/contact_information/senators_cfm.xml"
+xml <- xmlParse(rawToChar(GET(url)$content))
+xml_df <- xmlToDataFrame(xml)
+
+# Displaying the dimensions of the data 
+dim(xml_df)
+```
+
+# Question 2 
+```{r}
+# Constructing regular expression (regex) to extract only the first, last names, and party (D,R,I) of each senator
+senator <-str_extract(xml_df$first_name, "^[A-Z][a-z]+")
+# Mutate the 'first_name' column in the 'xml_df' data frame with the extracted first names
+senate <-xml_df %>%
+  mutate(first_name = senator)
+# Create a new data frame 'updated_df' with the updated 'first_name' and 'last_name' columns,
+# as well as the 'party' column from the 'senate' data frame
+updated_df<- data_frame(First_name = senate$first_name, Last_name = senate$last_name, Party = senate$party)
+# Convert 'updated_df' to a standard data frame and display the result
+as.data.frame(updated_df)
+```
+
+# Question 3 
+```{r}
+# Create a function called senatorsByState() 
+senatorsByState <- function(x){
+# Filter senators by the state abbreviation and select relevant columns
+    state_senate <- senate %>%
+    filter(state == x) %>%
+    select(state,first_name, last_name, party) %>%
+    group_by(state)
+# Create a message indicating the state abbreviation
+  state_message <- paste("The senators for",(x),"are: ")
+ # Create a string containing senator information (first name, last name, and party)
+  senator_info <- paste(state_senate$first_name, state_senate$last_name, ',', recode(state_senate$party, "D" = "Democratic Party", "R" = "Republican Party", "I" = "Independent Party"))
+# Combine the senator information using 'and' as a separator
+  senators_combined <- str_c(senator_info, collapse = " and ")
+ # Combine the state message and the senator information
+  result_message <- str_c(state_message, senators_combined)
+  return(result_message)
+}
+# Example
+senatorsByState("MA")
+
+```
+
+# Question 4 
+```{r}
+# Load the data from the CSV file 
+unemployment_data <- read.delim2("Ratio Of Female To Male Youth Unemployment Rate .csv", header=TRUE, sep = ",", skip=4)
+# Create a tibble with country names and codes
+country_info <- tibble(
+  Country_Name = unemployment_data$Country.Name,
+  Country_Code = unemployment_data$Country.Code
+)
+# Remove duplicate country entries
+country_name <- country_info %>%
+  distinct()
+country_name
+
+year_Value <- unemployment_data%>% 
+# Pivot the data to long format for years X1960 to X2020
+  pivot_longer(c('X1960':'X2020'), names_to = "Year", values_to = "Value")
+# Create a new data frame for indicator data
+indicator_Data = data.frame(unemployment_data$Country.Code, year_Value$Year, year_Value$Value)
+colnames(indicator_Data)[1] = "Country_Code"
+colnames(indicator_Data)[2] = "Year"
+colnames(indicator_Data)[3] = "Value"
+# Convert the indicator data to a tibble
+indicator_data <- as_tibble(indicator_Data)
+indicator_data
+```
+
+# Question 5 
+```{r}
+Continent_Name <- c("North America", "North America", "North America", "North America", "North America", "Asia", "Asia", "Asia", "Asia", "Asia", "Middle East", "Middle East", "Middle East", "Middle East", "Middle East")
+Country_Name <- c("United States", "Canada", "Mexico", "Greenland", "Cuba", "India", "China", 
+"Pakistan", "Afghanistan", "Bangladesh", "Saudi Arabia", "Yemen, Rep.", "Israel", "Iran, Islamic Rep.", "Jordan")
+continent_df <- data.frame(Continent_Name, Country_Name)
+
+join_df <- continent_df %>%
+  left_join(country_info, by = "Country_Name") %>%
+  left_join(indicator_data, by = "Country_Code")
+
+
+join_df %>%
+  filter(Year %in% c("X2001", "X2002", "X2003", "X2004", "X2005", "X2006", "X2007", "X2008", "X2009", "X2010", "X2011", "X2012", "X2013", "X2014", "X2015", "X2016", "X2017", "X2018", "X2019", "X2020")) %>%
+  ggplot(aes(Year, Value)) +
+  geom_line(aes(group = Country_Name, color = Country_Name)) +
+  facet_wrap(~Continent_Name, nrow = 3)
+
+```
+
+In Asia most of the countries in this segment show fluctuating values over the years. The china and India seem to be the most dominant in terms of magnitude.
+
+In Middle Eastern countries the ratio Of Female To Male Youth Unemployment Rate was the highest in Yemen in 2002, Saudi Arabia in 2003, Iran in 2006, Israel in 2008.
+
+In North America the trends for the countries in this region are fluctuating, with the green line  representing the United States being notably prominent.
